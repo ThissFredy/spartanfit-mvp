@@ -1,9 +1,29 @@
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
 }
 
 datasource db {
-  provider  = "postgresql"
+  provider   = "postgresql"
+  extensions = [vector]
+}
+
+model KnowledgeChunk {
+  id        String                     @id @default(uuid())
+  content   String                     @db.Text
+  metadata  Json?
+  embedding Unsupported("vector(768)")
+}
+
+model UserStats {
+  id                 String   @id @default(uuid())
+  userId             String   @unique
+  avgDaysPerWeek     Float    @default(0)
+  weeklyVolumeLoad   Float    @default(0)
+  favoriteExerciseId String?
+  lastCalculatedAt   DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 enum UserStatus {
@@ -71,9 +91,10 @@ model User {
   userGyms  UserGym[]
   createdAt DateTime  @default(now())
 
-  metrics  Metric[]
-  workouts WorkoutLog[]
-  messages ChatMessage[]
+  metrics   Metric[]
+  workouts  WorkoutLog[]
+  messages  ChatMessage[]
+  userStats UserStats?
 }
 
 model Metric {
