@@ -1,6 +1,11 @@
+import { generateText } from "ai";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
-import { streamText, embed } from "ai";
 import db from "@/lib/prisma";
+import { GoogleGenAI } from "@google/genai";
+
+const ai = new GoogleGenAI({
+  apiKey: process.env.GEMINI_API_KEY,
+});
 
 const google = createGoogleGenerativeAI({
   apiKey: process.env.GEMINI_API_KEY,
@@ -16,13 +21,25 @@ export async function POST(req: Request) {
     // Embed the user's query
     // Hacemos coincidir el string de búsqueda con el formato que usaste en Python
     const queryText = `task: search query | query: ${lastMessage.content}`;
-    const { embedding } = await embed({
-      model: google.textEmbeddingModel("text-embedding-002"), // Recomiendo dejar el 004 que es el equivalente oficial actual
-      value: queryText,
+    const response = await ai.models.embedContent({
+      model: "gemini-embedding-2",
+      contents: queryText,
+      config: {
+        outputDimensionality: 768,
+      },
     });
 
+    if (!response.embeddings || response.embeddings.length === 0) {
+      throw new Error("Failed to generate embedding");
+    }
+
+    const rawValues = response.embeddings[0].values;
+    const vectorString = `[${rawValues.join(", ")}]`;
+    console.log("Type: ", typeof vectorString);
+
     // Format embedding array to postgres vector string format: '[0.1, 0.2, ...]'
-    const vectorString = `[${embedding.join(",")}]`;
+
+    console.log("embedding: ", vectorString);
 
     // Query similar chunks from the database
     // Requires the match_knowledge_chunks RPC to be created in Supabase
@@ -64,14 +81,47 @@ Responde de manera concisa y útil usando la información anterior.
 `;
 
     // Create the chat completion stream
-    const result = streamText({
-      model: google("gemini-2.5-flash"),
-      system: systemPrompt,
-      messages,
-      temperature: 0.2,
+
+    if (!messages || messages.length === 0) {
+      throw new Error("El array de mensajes está vacío desde el cliente.");
+    }
+
+    const coreMessages = messages.map((msg: any) => {
+      // Extraemos el texto ya sea del nuevo formato 'parts' o del antiguo 'content'
+      let textContent = "";
+      if (Array.isArray(msg.parts)) {
+        textContent = msg.parts.map((p: any) => p.text || "").join(" ");
+      } else if (typeof msg.content === "string") {
+        textContent = msg.content;
+      }
+
+      return {
+        role:
+          msg.role === "user" ||
+          msg.role === "assistant" ||
+          msg.role === "system"
+            ? msg.role
+            : "user",
+        content: textContent.trim() !== "" ? textContent : "[Mensaje vacío]",
+      };
     });
 
-    return result.toTextStreamResponse();
+    // 2. Pasamos el array limpio al streamText
+    const result = await generateText({
+      model: google("gemini-2.5-flash"),
+      system: systemPrompt,
+      messages: coreMessages,
+      temperature: 0.2,
+      onFinish: ({ usage, finishReason }) => {
+        // Esto es opcional, pero te sirve para saber cuándo terminó
+        console.log("✅ Chat completado!");
+        console.log("Tokens usados:", usage);
+      },
+    });
+
+    console.log("Result: ", result);
+
+    return Response.json({ content: result.text });
   } catch (error) {
     console.error("Chat API Error:", error);
     return new Response("Error processing your request", { status: 500 });

@@ -1,41 +1,87 @@
 "use client";
 
-import { useChat } from "@ai-sdk/react";
 import { useEffect, useRef, useState } from "react";
-import { UserStats } from "@prisma/client";
+// import { UserStats } from "@prisma/client";
+
+interface Message {
+  id: string;
+  role: "user" | "assistant" | "system";
+  content: string;
+}
 
 interface ChatInterfaceProps {
   userName: string;
-  userStats: UserStats | null;
+  userStats: any | null;
 }
 
 export default function ChatInterface({
   userName,
   userStats,
 }: ChatInterfaceProps) {
-  const { messages, status, sendMessage } = useChat({
-    messages: [
-      {
-        id: "initial-greeting",
-        role: "assistant" as "assistant" | "user" | "system",
-        parts: [
-          {
-            type: "text",
-            text: `Hola ${userName}, ¿en qué te puedo ayudar hoy con tu entrenamiento o nutrición?`,
-          },
-        ],
-      },
-    ],
-  });
-
+  // 1. Estados nativos de React en lugar de useChat
+  const [messages, setMessages] = useState<Message[]>([
+    {
+      id: "initial-greeting",
+      role: "assistant",
+      content: `Hola ${userName}, ¿en qué te puedo ayudar hoy con tu entrenamiento o nutrición?`,
+    },
+  ]);
   const [input, setInput] = useState("");
-  const isLoading = status === "submitted" || status === "streaming";
+  const [isLoading, setIsLoading] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  // 2. Función manual para hacer el POST al backend
+  const handleSend = async (e?: React.FormEvent) => {
+    e?.preventDefault();
+    if (!input.trim() || isLoading) return;
+
+    // Guardamos el mensaje del usuario en la interfaz
+    const userMessage: Message = {
+      id: Date.now().toString(),
+      role: "user",
+      content: input,
+    };
+    const updatedMessages = [...messages, userMessage];
+
+    setMessages(updatedMessages);
+    setInput("");
+    setIsLoading(true);
+
+    try {
+      // Hacemos la petición esperando a que el servidor termine
+      const response = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messages: updatedMessages,
+          userStats,
+        }),
+      });
+
+      if (!response.ok) throw new Error("Error en la respuesta del servidor");
+
+      const data = await response.json();
+
+      // Agregamos la respuesta completa de la IA de un solo golpe
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: (Date.now() + 1).toString(),
+          role: "assistant",
+          content: data.content,
+        },
+      ]);
+    } catch (error) {
+      console.error("Error al enviar mensaje:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
     <div className="flex flex-col h-[calc(100vh-4rem)] max-w-3xl mx-auto w-full p-4">
@@ -54,14 +100,13 @@ export default function ChatInterface({
               {message.role === "user" ? userName : "Coach"}
             </span>
             <div className="whitespace-pre-wrap">
-              {message.parts?.map((part, idx) =>
-                part.type === "text" ? (
-                  <span key={idx}>{part.text}</span>
-                ) : null,
-              )}
+              {/* Volvemos a renderizar solo el contenido plano */}
+              {message.content}
             </div>
           </div>
         ))}
+
+        {/* Indicador de carga (Súper importante ahora que no hay stream) */}
         {isLoading && (
           <div className="bg-gray-800 text-gray-400 self-start mr-auto rounded-xl rounded-bl-none px-4 py-3 max-w-[80%]">
             <div className="flex space-x-1 items-center h-4">
@@ -74,30 +119,19 @@ export default function ChatInterface({
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Chat Input Area */}
+      {/* Chat Input Area (Queda exactamente igual) */}
       <div className="bg-gray-900 border border-gray-800 rounded-2xl p-2 shadow-lg">
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            if (!input.trim() || isLoading) return;
-            sendMessage({ text: input }, { body: { userStats } });
-            setInput("");
-          }}
-          className="flex gap-2 items-end"
-        >
+        <form onSubmit={handleSend} className="flex gap-2 items-end">
           <textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="Escribe tu consulta sobre entrenamiento o nutrición..."
+            placeholder="Escribe tu consulta..."
             className="flex-1 max-h-32 min-h-[44px] bg-transparent border-none focus:ring-0 resize-none px-3 py-2 text-white placeholder-gray-500"
             rows={1}
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();
-                if (input.trim() && !isLoading) {
-                  sendMessage({ text: input }, { body: { userStats } });
-                  setInput("");
-                }
+                handleSend();
               }
             }}
           />
