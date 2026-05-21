@@ -1,45 +1,45 @@
-import { getGyms } from "@/actions/gym.actions";
+﻿import { getGyms } from "@/actions/gym.actions";
 import { getCities } from "@/actions/city.actions";
 import { GymsView } from "@/components/features/admin/GymsView";
 import { UserService } from "@/lib/services/user.service";
 import { createClient } from "@/utils/supabase/server";
 import { redirect } from "next/navigation";
+import { AppShell } from "@/components/layout/AppShell";
 
 export const metadata = {
-  title: 'Administración de Gimnasios | SpartanFit',
-}
+  title: "Administración de gimnasios",
+};
 
 export default async function AdminGymsPage() {
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
   if (!user) {
     redirect("/?error=unauthorized");
   }
 
-  // Security Check: Verify Admin Role
   const dbUser = await UserService.getUserProfile(user.id);
   if (dbUser?.role?.name !== "ADMIN") {
     redirect("/dashboard?error=admin_required");
   }
 
   const [{ data: initialGyms }, { data: activeCities }] = await Promise.all([
-    getGyms(true), // Traer inactivos también
-    getCities(false) // Solo ciudades activas para la creación/edición
+    getGyms(true),
+    getCities(false),
   ]);
 
   return (
-    <div className="min-h-screen bg-black py-12">
-      <div className="container mx-auto px-4 max-w-7xl">
-        <div className="mb-8 flex justify-between items-end border-b border-white/10 pb-6">
-          <div>
-            <h1 className="text-3xl font-black text-white tracking-tight">Administración de Gimnasios</h1>
-            <p className="text-white/50 mt-2 text-sm">Gestiona las sucursales y ubicaciones de entrenamiento.</p>
-          </div>
-        </div>
-        
-        <GymsView initialGyms={initialGyms || []} activeCities={activeCities || []} />
-      </div>
-    </div>
+    <AppShell
+      userName={dbUser.name || user.email || "Admin"}
+      userEmail={user.email || ""}
+      isAdmin
+      title="Administración de gimnasios"
+      description="Gestiona las sedes y su ciudad asociada."
+    >
+      <GymsView initialGyms={initialGyms || []} activeCities={activeCities || []} />
+    </AppShell>
   );
 }
+

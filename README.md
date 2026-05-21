@@ -24,3 +24,17 @@ El proyecto está construido con un entorno full-stack JavaScript moderno:
 
 ### 🤖 AI-Driven Workflow
 Este repositorio utiliza un enfoque de **Spec-Driven Development** guiado por este archivo `AGENTS.md`. Los requerimientos se transforman en especificaciones técnicas (`specs/`) y el código se genera sistemáticamente (Base de datos -> Servicios -> Frontend) basándose en contratos aprobados.
+## Configuracion de entorno local
+
+1. Copia `.env.example` a `.env`.
+2. Reemplaza placeholders con valores reales de Supabase y PostgreSQL.
+3. No uses `example.supabase.co` en ejecucion real.
+4. Ejecuta:
+   - `npm install`
+   - `npx prisma generate`
+   - `npm run dev`
+
+5. Para respuestas IA reales en `/chat`, define también:
+   - `GEMINI_API_KEY`
+
+Si `GEMINI_API_KEY` no está disponible, SpartanFit usa un fallback local de respuestas para no romper la experiencia.

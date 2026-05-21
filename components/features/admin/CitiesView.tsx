@@ -1,16 +1,27 @@
-"use client";
+﻿"use client";
 
 import { useState } from "react";
-import { createCity, updateCity, toggleCityStatus } from "@/actions/city.actions";
+import { createCity, toggleCityStatus, updateCity } from "@/actions/city.actions";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Dialog } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { useToast } from "@/components/ui/toast";
+import { CityRecord } from "@/lib/types/admin.types";
 
-export function CitiesView({ initialCities }: { initialCities: any[] }) {
-  const [cities, setCities] = useState(initialCities);
+interface Props {
+  initialCities: CityRecord[];
+}
+
+export function CitiesView({ initialCities }: Props) {
+  const [cities, setCities] = useState<CityRecord[]>(initialCities);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingCity, setEditingCity] = useState<any | null>(null);
+  const [editingCity, setEditingCity] = useState<CityRecord | null>(null);
   const [formData, setFormData] = useState({ name: "", isActive: true });
   const [loading, setLoading] = useState(false);
+  const { pushToast } = useToast();
 
-  const handleOpenModal = (city?: any) => {
+  const handleOpenModal = (city?: CityRecord) => {
     if (city) {
       setEditingCity(city);
       setFormData({ name: city.name, isActive: city.isActive });
@@ -21,78 +32,91 @@ export function CitiesView({ initialCities }: { initialCities: any[] }) {
     setIsModalOpen(true);
   };
 
-  const handleSave = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSave = async (event: React.FormEvent) => {
+    event.preventDefault();
     setLoading(true);
-    let res;
-    if (editingCity) {
-      res = await updateCity(editingCity.id, formData);
-    } else {
-      res = await createCity(formData);
-    }
-    
-    if (res.success && res.data) {
+
+    const response = editingCity
+      ? await updateCity(editingCity.id, formData)
+      : await createCity(formData);
+
+    setLoading(false);
+
+    if (response.success && response.data) {
+      const savedCity = response.data as CityRecord;
       if (editingCity) {
-        setCities(cities.map(c => c.id === res.data.id ? res.data : c));
+        setCities((prev) => prev.map((city) => (city.id === savedCity.id ? savedCity : city)));
       } else {
-        setCities([...cities, res.data]);
+        setCities((prev) => [...prev, savedCity]);
       }
       setIsModalOpen(false);
-    } else {
-      alert(res.error || "Error al guardar");
+      pushToast({
+        variant: "success",
+        title: editingCity ? "Ciudad actualizada" : "Ciudad creada",
+      });
+      return;
     }
-    setLoading(false);
+
+    pushToast({
+      variant: "error",
+      title: "No se pudo guardar la ciudad",
+      description: response.error || "Error inesperado",
+    });
   };
 
   const handleToggleStatus = async (id: string) => {
-    const res = await toggleCityStatus(id);
-    if (res.success && res.data) {
-      setCities(cities.map(c => c.id === id ? res.data : c));
-    } else {
-      alert(res.error || "Error al cambiar estado");
+    const response = await toggleCityStatus(id);
+    if (response.success && response.data) {
+      setCities((prev) =>
+        prev.map((city) => (city.id === id ? (response.data as CityRecord) : city)),
+      );
+      return;
     }
+
+    pushToast({
+      variant: "error",
+      title: "No se pudo cambiar el estado",
+      description: response.error || "Error inesperado",
+    });
   };
 
   return (
     <div className="space-y-6">
       <div className="flex justify-end">
-        <button 
-          onClick={() => handleOpenModal()}
-          className="bg-white text-black px-4 py-2 rounded-lg font-medium hover:bg-white/90 transition-colors"
-        >
-          + Nueva Ciudad
-        </button>
+        <Button onClick={() => handleOpenModal()}>+ Nueva ciudad</Button>
       </div>
 
-      <div className="bg-white/5 border border-white/10 rounded-xl overflow-hidden backdrop-blur-md">
-        <table className="w-full text-left text-sm text-white">
-          <thead className="bg-white/5 text-white/50 text-xs uppercase border-b border-white/10">
+      <div className="overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900/70">
+        <table className="w-full text-left text-sm text-zinc-200">
+          <thead className="border-b border-zinc-800 bg-zinc-800/70 text-xs uppercase text-zinc-400">
             <tr>
               <th className="px-6 py-4 font-medium">Nombre</th>
               <th className="px-6 py-4 font-medium">Estado</th>
-              <th className="px-6 py-4 font-medium text-right">Acciones</th>
+              <th className="px-6 py-4 text-right font-medium">Acciones</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-white/5">
+          <tbody className="divide-y divide-zinc-800">
             {cities.map((city) => (
-              <tr key={city.id} className="hover:bg-white/5 transition-colors">
+              <tr key={city.id} className="transition-colors hover:bg-zinc-800/40">
                 <td className="px-6 py-4 font-medium">{city.name}</td>
                 <td className="px-6 py-4">
-                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${city.isActive ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
+                  <Badge variant={city.isActive ? "success" : "danger"}>
                     {city.isActive ? "Activo" : "Inactivo"}
-                  </span>
+                  </Badge>
                 </td>
-                <td className="px-6 py-4 text-right space-x-3">
-                  <button onClick={() => handleOpenModal(city)} className="text-white/70 hover:text-white transition">Editar</button>
-                  <button onClick={() => handleToggleStatus(city.id)} className={`${city.isActive ? 'text-red-400 hover:text-red-300' : 'text-green-400 hover:text-green-300'} transition`}>
+                <td className="space-x-2 px-6 py-4 text-right">
+                  <Button variant="ghost" size="sm" onClick={() => handleOpenModal(city)}>
+                    Editar
+                  </Button>
+                  <Button variant="ghost" size="sm" onClick={() => handleToggleStatus(city.id)}>
                     {city.isActive ? "Desactivar" : "Activar"}
-                  </button>
+                  </Button>
                 </td>
               </tr>
             ))}
             {cities.length === 0 && (
               <tr>
-                <td colSpan={3} className="px-6 py-8 text-center text-white/50">
+                <td colSpan={3} className="px-6 py-8 text-center text-zinc-500">
                   No hay ciudades registradas.
                 </td>
               </tr>
@@ -101,58 +125,51 @@ export function CitiesView({ initialCities }: { initialCities: any[] }) {
         </table>
       </div>
 
-      {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div className="bg-[#111] border border-white/10 w-full max-w-md rounded-2xl overflow-hidden shadow-2xl">
-            <div className="p-6">
-              <h2 className="text-xl font-bold text-white mb-4">
-                {editingCity ? "Editar Ciudad" : "Nueva Ciudad"}
-              </h2>
-              <form onSubmit={handleSave} className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-white/70 mb-1">Nombre de la Ciudad</label>
-                  <input
-                    type="text"
-                    required
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-white/20 transition-all"
-                    placeholder="Ej. Ciudad de México"
-                  />
-                </div>
-                {!editingCity && (
-                  <div className="flex items-center space-x-2">
-                    <input
-                      type="checkbox"
-                      id="isActive"
-                      checked={formData.isActive}
-                      onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
-                      className="rounded border-white/20 bg-white/5 text-white focus:ring-0 focus:ring-offset-0"
-                    />
-                    <label htmlFor="isActive" className="text-sm text-white/70">Activo desde su creación</label>
-                  </div>
-                )}
-                <div className="flex justify-end space-x-3 mt-8">
-                  <button
-                    type="button"
-                    onClick={() => setIsModalOpen(false)}
-                    className="px-4 py-2 rounded-lg text-sm font-medium text-white/70 hover:text-white transition-colors"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={loading}
-                    className="px-4 py-2 rounded-lg text-sm font-medium bg-white text-black hover:bg-white/90 disabled:opacity-50 transition-colors"
-                  >
-                    {loading ? "Guardando..." : "Guardar"}
-                  </button>
-                </div>
-              </form>
-            </div>
+      <Dialog
+        open={isModalOpen}
+        onOpenChange={setIsModalOpen}
+        title={editingCity ? "Editar ciudad" : "Nueva ciudad"}
+      >
+        <form onSubmit={handleSave} className="space-y-4">
+          <div>
+            <label htmlFor="city-name" className="mb-1 block text-sm text-zinc-300">
+              Nombre de la ciudad
+            </label>
+            <Input
+              id="city-name"
+              type="text"
+              required
+              value={formData.name}
+              onChange={(event) => setFormData((prev) => ({ ...prev, name: event.target.value }))}
+              placeholder="Ej. Ciudad de Mexico"
+            />
           </div>
-        </div>
-      )}
+
+          {!editingCity && (
+            <label className="flex items-center gap-2 text-sm text-zinc-300">
+              <input
+                type="checkbox"
+                checked={formData.isActive}
+                onChange={(event) =>
+                  setFormData((prev) => ({ ...prev, isActive: event.target.checked }))
+                }
+                className="h-4 w-4 accent-spartan"
+              />
+              Activo desde su creación
+            </label>
+          )}
+
+          <div className="flex justify-end gap-2 pt-2">
+            <Button type="button" variant="secondary" onClick={() => setIsModalOpen(false)}>
+              Cancelar
+            </Button>
+            <Button type="submit" loading={loading}>
+              Guardar
+            </Button>
+          </div>
+        </form>
+      </Dialog>
     </div>
   );
 }
+

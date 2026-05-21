@@ -5,6 +5,7 @@ import { UserService } from "@/lib/services/user.service";
 import prisma from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { UpdateUserProfileDTO } from "@/lib/types/user.types";
+import { Prisma } from "@prisma/client";
 
 export interface AdminUserFilters {
   searchQuery?: string;
@@ -36,23 +37,23 @@ export async function getFilteredUsers(filters: AdminUserFilters, page: number =
 
   const skip = (page - 1) * pageSize;
 
-  const AND: any[] = [];
+  const andConditions: Prisma.UserWhereInput[] = [];
 
   if (filters.searchQuery) {
-    AND.push({ name: { contains: filters.searchQuery, mode: 'insensitive' } });
+    andConditions.push({ name: { contains: filters.searchQuery, mode: "insensitive" } });
   }
 
-  if (filters.roleId && filters.roleId !== 'ALL') {
-    AND.push({ roleId: filters.roleId });
+  if (filters.roleId && filters.roleId !== "ALL") {
+    andConditions.push({ roleId: filters.roleId });
   }
 
   // Age logic
   if (filters.ageRange) {
     const ageCondition = { age: { gte: filters.ageRange.min, lte: filters.ageRange.max } };
     if (filters.includeNulls) {
-      AND.push({ OR: [ageCondition, { age: null }] });
+      andConditions.push({ OR: [ageCondition, { age: null }] });
     } else {
-      AND.push(ageCondition);
+      andConditions.push(ageCondition);
     }
   }
 
@@ -60,13 +61,14 @@ export async function getFilteredUsers(filters: AdminUserFilters, page: number =
   if (filters.weightRange) {
     const weightCondition = { weight: { gte: filters.weightRange.min, lte: filters.weightRange.max } };
     if (filters.includeNulls) {
-      AND.push({ OR: [weightCondition, { weight: null }] });
+      andConditions.push({ OR: [weightCondition, { weight: null }] });
     } else {
-      AND.push(weightCondition);
+      andConditions.push(weightCondition);
     }
   }
 
-  const whereClause = AND.length > 0 ? { AND } : {};
+  const whereClause: Prisma.UserWhereInput =
+    andConditions.length > 0 ? { AND: andConditions } : {};
 
   const [users, totalCount] = await Promise.all([
     prisma.user.findMany({
@@ -86,14 +88,13 @@ export async function getFilteredUsers(filters: AdminUserFilters, page: number =
 }
 
 // Omit name and email
-export async function updateUserAsAdmin(userId: string, data: Partial<UpdateUserProfileDTO> & { status?: "ACTIVE" | "SUSPENDED" }) {
+export async function updateUserAsAdmin(
+  userId: string,
+  data: Omit<Partial<UpdateUserProfileDTO>, "name"> & { status?: "ACTIVE" | "SUSPENDED" },
+) {
   await ensureAdmin();
 
-  // Strip protected fields explicitly
   const { gymIds, ...safeData } = data;
-  delete safeData.name;
-  // @ts-ignore - explicitly removing it just in case
-  delete safeData.email;
 
   await prisma.user.update({
     where: { id: userId },

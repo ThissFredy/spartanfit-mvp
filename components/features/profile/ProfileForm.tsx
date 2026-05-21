@@ -1,139 +1,339 @@
-"use client";
+﻿"use client";
 
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { updateProfileAction, suspendAccountAction } from "@/actions/user.actions";
 import { UserProfileResponse } from "@/lib/types/user.types";
 import { GymMultiSelect } from "./../users/GymMultiSelect";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
+import { useToast } from "@/components/ui/toast";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { ErrorState } from "@/components/ui/error-state";
 
 interface Props {
   user: UserProfileResponse;
   gyms: { id: string; name: string }[];
-  roles: { id: string; name: string }[];
 }
 
-export function ProfileForm({ user, gyms, roles }: Props) {
-  const [isPending, startTransition] = useTransition();
-  const [error, setError] = useState<string | null>(null);
+interface FormState {
+  name: string;
+  age: string;
+  weight: string;
+  height: string;
+  activityIndex: string;
+  goal: string;
+}
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const formData = new FormData(e.currentTarget);
-    
-    const data = {
-      name: formData.get("name") as string,
-      age: formData.get("age") ? parseInt(formData.get("age") as string) : null,
-      weight: formData.get("weight") ? parseFloat(formData.get("weight") as string) : null,
-      height: formData.get("height") ? parseFloat(formData.get("height") as string) : null,
-      activityIndex: formData.get("activityIndex") ? parseInt(formData.get("activityIndex") as string) : null,
-      goal: formData.get("goal") as string,
-      gymIds: formData.getAll("gymIds") as string[],
-      roleId: formData.get("roleId") as string || undefined,
+const defaultGoal = "pending";
+
+export function ProfileForm({ user, gyms }: Props) {
+  const [isPending, startTransition] = useTransition();
+  const [isSuspendOpen, setIsSuspendOpen] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [selectedGymIds, setSelectedGymIds] = useState<string[]>(
+    user.userGyms?.map((userGym) => userGym.gymLocation.id) || [],
+  );
+  const [form, setForm] = useState<FormState>({
+    name: user.name || "",
+    age: user.age ? String(user.age) : "",
+    weight: user.weight ? String(user.weight) : "",
+    height: user.height ? String(user.height) : "",
+    activityIndex: user.activityIndex ? String(user.activityIndex) : "",
+    goal: user.goal || defaultGoal,
+  });
+
+  const { pushToast } = useToast();
+
+  const updateField = (field: keyof FormState, value: string) => {
+    setForm((prev) => ({ ...prev, [field]: value }));
+    setFieldErrors((prev) => {
+      if (!prev[field]) return prev;
+      const next = { ...prev };
+      delete next[field];
+      return next;
+    });
+  };
+
+  const parsedPayload = useMemo(() => {
+    const toNumberOrNull = (value: string) => {
+      if (!value.trim()) return null;
+      return Number(value);
     };
+
+    return {
+      name: form.name.trim(),
+      age: toNumberOrNull(form.age),
+      weight: toNumberOrNull(form.weight),
+      height: toNumberOrNull(form.height),
+      activityIndex: toNumberOrNull(form.activityIndex),
+      goal: form.goal,
+      gymIds: selectedGymIds,
+    };
+  }, [form, selectedGymIds]);
+
+  const validateForm = () => {
+    const nextErrors: Record<string, string> = {};
+
+    if (!parsedPayload.name || parsedPayload.name.length < 2) {
+      nextErrors.name = "Ingresa un nombre válido de al menos 2 caracteres.";
+    }
+
+    if (parsedPayload.age !== null && (parsedPayload.age < 10 || parsedPayload.age > 100)) {
+      nextErrors.age = "La edad debe estar entre 10 y 100.";
+    }
+
+    if (parsedPayload.weight !== null && (parsedPayload.weight < 20 || parsedPayload.weight > 400)) {
+      nextErrors.weight = "El peso debe estar entre 20 y 400 kg.";
+    }
+
+    if (parsedPayload.height !== null && (parsedPayload.height < 80 || parsedPayload.height > 250)) {
+      nextErrors.height = "La altura debe estar entre 80 y 250 cm.";
+    }
+
+    if (
+      parsedPayload.activityIndex !== null &&
+      (parsedPayload.activityIndex < 1 || parsedPayload.activityIndex > 10)
+    ) {
+      nextErrors.activityIndex = "El índice de actividad debe estar entre 1 y 10.";
+    }
+
+    if (!parsedPayload.goal || parsedPayload.goal === defaultGoal) {
+      nextErrors.goal = "Selecciona un objetivo principal.";
+    }
+
+    setFieldErrors(nextErrors);
+    return Object.keys(nextErrors).length === 0;
+  };
+
+  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    if (!validateForm()) {
+      pushToast({
+        variant: "error",
+        title: "Revisa el formulario",
+        description: "Hay campos pendientes o con valores inválidos.",
+      });
+      return;
+    }
 
     startTransition(async () => {
       try {
         setError(null);
-        await updateProfileAction(data);
-        alert("Perfil actualizado correctamente");
-      } catch (err: any) {
-        setError(err.message || "Error al actualizar perfil");
+        await updateProfileAction(parsedPayload);
+        pushToast({
+          variant: "success",
+          title: "Perfil actualizado",
+          description: "Tus cambios se guardaron correctamente.",
+        });
+      } catch (caughtError) {
+        const message = caughtError instanceof Error ? caughtError.message : "Error al actualizar perfil";
+        setError(message);
+        pushToast({
+          variant: "error",
+          title: "No se pudo actualizar",
+          description: message,
+        });
       }
     });
   };
 
-  const handleSuspend = () => {
-    if (window.confirm("¿Estás seguro de que deseas eliminar tu cuenta? Esta acción suspenderá tu acceso de forma inmediata.")) {
-      startTransition(async () => {
-        try {
-          await suspendAccountAction();
-        } catch (err: any) {
-          setError(err.message || "Error al suspender cuenta");
-        }
-      });
-    }
+  const confirmSuspend = () => {
+    startTransition(async () => {
+      try {
+        setError(null);
+        await suspendAccountAction();
+      } catch (caughtError) {
+        const message = caughtError instanceof Error ? caughtError.message : "Error al suspender cuenta";
+        setError(message);
+        pushToast({
+          variant: "error",
+          title: "No se pudo eliminar la cuenta",
+          description: message,
+        });
+      }
+    });
   };
 
   return (
-    <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-8 max-w-xl shadow-lg">
-      <h2 className="text-2xl font-semibold mb-6">Mi Perfil</h2>
-      
-      {error && <div className="bg-red-500/10 border border-red-500 text-red-500 p-3 rounded mb-4">{error}</div>}
-
-      <form onSubmit={handleSubmit} className="space-y-5">
-        <div className="space-y-2">
-          <label className="block text-sm font-medium text-zinc-300">Nombre</label>
-          <input type="text" name="name" defaultValue={user.name || ""} required className="w-full bg-zinc-800 border border-zinc-700 rounded-md px-4 py-3 text-white focus:outline-none focus:border-[#c22524] focus:ring-1 focus:ring-[#c22524]" />
-        </div>
-
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <label className="block text-sm font-medium text-zinc-300">Edad</label>
-            <input type="number" name="age" defaultValue={user.age || ""} className="w-full bg-zinc-800 border border-zinc-700 rounded-md px-4 py-3 text-white focus:outline-none focus:border-[#c22524] focus:ring-1 focus:ring-[#c22524]" />
-          </div>
-          <div className="space-y-2">
-            <label className="block text-sm font-medium text-zinc-300">Peso (kg)</label>
-            <input type="number" step="0.1" name="weight" defaultValue={user.weight || ""} className="w-full bg-zinc-800 border border-zinc-700 rounded-md px-4 py-3 text-white focus:outline-none focus:border-[#c22524] focus:ring-1 focus:ring-[#c22524]" />
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <label className="block text-sm font-medium text-zinc-300">Altura (cm)</label>
-            <input type="number" step="0.1" name="height" defaultValue={user.height || ""} className="w-full bg-zinc-800 border border-zinc-700 rounded-md px-4 py-3 text-white focus:outline-none focus:border-[#c22524] focus:ring-1 focus:ring-[#c22524]" />
-          </div>
-          <div className="space-y-2">
-            <label className="block text-sm font-medium text-zinc-300">Índice Actividad (1-10)</label>
-            <input type="number" min="1" max="10" name="activityIndex" defaultValue={user.activityIndex || ""} className="w-full bg-zinc-800 border border-zinc-700 rounded-md px-4 py-3 text-white focus:outline-none focus:border-[#c22524] focus:ring-1 focus:ring-[#c22524]" />
-          </div>
-        </div>
-
-        <div className="space-y-2">
-          <label className="block text-sm font-medium text-zinc-300">Objetivo principal</label>
-          <select name="goal" defaultValue={user.goal || "pending"} required className="w-full bg-zinc-800 border border-zinc-700 rounded-md px-4 py-3 text-white focus:outline-none focus:border-[#c22524] focus:ring-1 focus:ring-[#c22524]">
-            <option value="pending" disabled>Selecciona un objetivo...</option>
-            <option value="hipertrofia">Hipertrofia</option>
-            <option value="fuerza">Fuerza</option>
-            <option value="perdida de peso">Pérdida de peso</option>
-            <option value="mantencion">Mantención</option>
-            <option value="salud general">Salud general</option>
-          </select>
-        </div>
-
-        <div className="space-y-2">
-          <label className="block text-sm font-medium text-zinc-300">Gimnasios a los que asistes</label>
-          <GymMultiSelect 
-            gyms={gyms} 
-            initialSelectedIds={user.userGyms?.map(ug => ug.gymLocation.id) || []} 
-            onChange={() => {}} 
-          />
-        </div>
-
-        <div className="space-y-2">
-          <label className="block text-sm font-medium text-zinc-500">Rol asignado</label>
-          {!user.roleId ? (
-            <select name="roleId" required className="w-full bg-zinc-800 border border-zinc-700 rounded-md px-4 py-3 text-white focus:outline-none focus:border-[#c22524] focus:ring-1 focus:ring-[#c22524]">
-              <option value="" disabled selected>Selecciona tu rol...</option>
-              {roles.map(role => (
-                <option key={role.id} value={role.id}>{role.name}</option>
-              ))}
-            </select>
-          ) : (
-            <input type="text" readOnly disabled value={user.role?.name || "Sin asignar"} className="w-full bg-zinc-800/50 border border-zinc-800 rounded-md px-4 py-3 text-zinc-500 cursor-not-allowed" />
+    <>
+      <Card className="mx-auto w-full max-w-3xl">
+        <CardHeader>
+          <CardTitle>Mi perfil</CardTitle>
+          <CardDescription>
+            Completa tus datos para personalizar tu plan de entrenamiento y seguimiento.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {error && (
+            <div className="mb-5">
+              <ErrorState description={error} />
+            </div>
           )}
-        </div>
 
-        <button type="submit" disabled={isPending} className="w-full bg-[#c22524] hover:bg-[#a61f1e] text-white font-bold py-3 px-4 rounded-md transition-colors mt-4 disabled:opacity-50">
-          {isPending ? "Guardando..." : "Guardar Perfil"}
-        </button>
-      </form>
+          <form onSubmit={handleSubmit} className="space-y-5">
+            <div className="space-y-2">
+              <label htmlFor="name" className="text-sm font-medium text-zinc-300">
+                Nombre
+              </label>
+              <Input
+                id="name"
+                name="name"
+                value={form.name}
+                hasError={Boolean(fieldErrors.name)}
+                onChange={(event) => updateField("name", event.target.value)}
+                disabled={isPending}
+                required
+              />
+              {fieldErrors.name && <p className="text-xs text-red-300">{fieldErrors.name}</p>}
+            </div>
 
-      <div className="mt-12 pt-6 border-t border-zinc-800">
-        <h3 className="text-xl font-semibold text-red-500 mb-2">Zona de Peligro</h3>
-        <p className="text-zinc-400 text-sm mb-4">Eliminar tu cuenta suspenderá tu acceso a la plataforma.</p>
-        <button type="button" onClick={handleSuspend} disabled={isPending} className="border border-red-500 text-red-500 hover:bg-red-500 hover:text-white font-bold py-2 px-4 rounded transition-colors disabled:opacity-50">
-          Eliminar cuenta
-        </button>
-      </div>
-    </div>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <label htmlFor="age" className="text-sm font-medium text-zinc-300">
+                  Edad
+                </label>
+                <Input
+                  id="age"
+                  name="age"
+                  type="number"
+                  value={form.age}
+                  hasError={Boolean(fieldErrors.age)}
+                  onChange={(event) => updateField("age", event.target.value)}
+                  disabled={isPending}
+                />
+                {fieldErrors.age && <p className="text-xs text-red-300">{fieldErrors.age}</p>}
+              </div>
+              <div className="space-y-2">
+                <label htmlFor="weight" className="text-sm font-medium text-zinc-300">
+                  Peso (kg)
+                </label>
+                <Input
+                  id="weight"
+                  name="weight"
+                  type="number"
+                  step="0.1"
+                  value={form.weight}
+                  hasError={Boolean(fieldErrors.weight)}
+                  onChange={(event) => updateField("weight", event.target.value)}
+                  disabled={isPending}
+                />
+                {fieldErrors.weight && <p className="text-xs text-red-300">{fieldErrors.weight}</p>}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <label htmlFor="height" className="text-sm font-medium text-zinc-300">
+                  Altura (cm)
+                </label>
+                <Input
+                  id="height"
+                  name="height"
+                  type="number"
+                  step="0.1"
+                  value={form.height}
+                  hasError={Boolean(fieldErrors.height)}
+                  onChange={(event) => updateField("height", event.target.value)}
+                  disabled={isPending}
+                />
+                {fieldErrors.height && <p className="text-xs text-red-300">{fieldErrors.height}</p>}
+              </div>
+              <div className="space-y-2">
+                <label htmlFor="activityIndex" className="text-sm font-medium text-zinc-300">
+                  Índice de actividad (1-10)
+                </label>
+                <Input
+                  id="activityIndex"
+                  name="activityIndex"
+                  type="number"
+                  min={1}
+                  max={10}
+                  value={form.activityIndex}
+                  hasError={Boolean(fieldErrors.activityIndex)}
+                  onChange={(event) => updateField("activityIndex", event.target.value)}
+                  disabled={isPending}
+                />
+                {fieldErrors.activityIndex && (
+                  <p className="text-xs text-red-300">{fieldErrors.activityIndex}</p>
+                )}
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <label htmlFor="goal" className="text-sm font-medium text-zinc-300">
+                Objetivo principal
+              </label>
+              <Select
+                id="goal"
+                name="goal"
+                value={form.goal}
+                hasError={Boolean(fieldErrors.goal)}
+                onChange={(event) => updateField("goal", event.target.value)}
+                disabled={isPending}
+              >
+                <option value={defaultGoal} disabled>
+                  Selecciona un objetivo...
+                </option>
+                <option value="hipertrofia">Hipertrofia</option>
+                <option value="fuerza">Fuerza</option>
+                <option value="perdida de peso">Pérdida de peso</option>
+                <option value="mantencion">Mantención</option>
+                <option value="salud general">Salud general</option>
+              </Select>
+              {fieldErrors.goal && <p className="text-xs text-red-300">{fieldErrors.goal}</p>}
+            </div>
+
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-zinc-300">Gimnasios a los que asistes</p>
+              <GymMultiSelect
+                gyms={gyms}
+                initialSelectedIds={selectedGymIds}
+                onChange={setSelectedGymIds}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-zinc-300">Rol asignado</label>
+              <Input value={user.role?.name || "Usuario"} readOnly disabled />
+              <p className="text-xs text-zinc-500">
+                El rol de acceso lo asigna únicamente un administrador.
+              </p>
+            </div>
+
+            <Button type="submit" loading={isPending} className="w-full sm:w-auto">
+              Guardar perfil
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
+
+      <Card className="mx-auto mt-6 w-full max-w-3xl border-red-500/30 bg-red-500/5">
+        <CardHeader>
+          <CardTitle className="text-red-200">Zona de peligro</CardTitle>
+          <CardDescription>
+            Eliminar tu cuenta suspenderá tu acceso inmediatamente.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Button variant="danger" onClick={() => setIsSuspendOpen(true)} disabled={isPending}>
+            Eliminar cuenta
+          </Button>
+        </CardContent>
+      </Card>
+
+      <ConfirmDialog
+        open={isSuspendOpen}
+        onOpenChange={setIsSuspendOpen}
+        title="¿Eliminar cuenta?"
+        description="Esta acción suspenderá tu acceso de manera inmediata."
+        confirmText="Sí, eliminar"
+        onConfirm={confirmSuspend}
+        pending={isPending}
+      />
+    </>
   );
 }

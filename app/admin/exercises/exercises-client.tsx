@@ -1,8 +1,13 @@
-"use client";
+﻿"use client";
 
 import { useState } from "react";
 import { createExercise, updateExerciseStatus } from "@/actions/exercise.actions";
 import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Card } from "@/components/ui/card";
+import { useToast } from "@/components/ui/toast";
 
 type Exercise = {
   id: string;
@@ -14,77 +19,105 @@ export function ExercisesClient({ initialExercises }: { initialExercises: Exerci
   const [exercises, setExercises] = useState(initialExercises);
   const [newExercise, setNewExercise] = useState("");
   const [loading, setLoading] = useState(false);
+  const [savingId, setSavingId] = useState<string | null>(null);
   const router = useRouter();
+  const { pushToast } = useToast();
 
-  const handleAdd = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleAdd = async (event: React.FormEvent) => {
+    event.preventDefault();
     if (!newExercise.trim()) return;
+
     setLoading(true);
-    const res = await createExercise(newExercise.trim());
-    if (res.success) {
-      setNewExercise("");
-      window.location.reload(); 
-    } else {
-      alert(res.error);
-    }
+    const response = await createExercise(newExercise.trim());
     setLoading(false);
+
+    if (response.success) {
+      setNewExercise("");
+      router.refresh();
+      pushToast({
+        variant: "success",
+        title: "Ejercicio agregado",
+        description: "Se creó correctamente en el catálogo.",
+      });
+      return;
+    }
+
+    pushToast({
+      variant: "error",
+      title: "No se pudo crear el ejercicio",
+      description: response.error,
+    });
   };
 
   const handleToggleStatus = async (id: string, currentStatus: boolean) => {
-    const res = await updateExerciseStatus(id, !currentStatus);
-    if (res.success) {
-      setExercises(exercises.map(ex => ex.id === id ? { ...ex, isActive: !currentStatus } : ex));
+    setSavingId(id);
+    const response = await updateExerciseStatus(id, !currentStatus);
+    setSavingId(null);
+
+    if (response.success) {
+      setExercises((prev) =>
+        prev.map((exercise) =>
+          exercise.id === id ? { ...exercise, isActive: !currentStatus } : exercise,
+        ),
+      );
       router.refresh();
-    } else {
-      alert(res.error);
+      return;
     }
+
+    pushToast({
+      variant: "error",
+      title: "No se pudo actualizar",
+      description: response.error,
+    });
   };
 
   return (
     <div className="space-y-6">
-      <form onSubmit={handleAdd} className="flex flex-col sm:flex-row gap-4">
-        <input
+      <form onSubmit={handleAdd} className="flex flex-col gap-3 sm:flex-row">
+        <label htmlFor="new-exercise" className="sr-only">
+          Nombre del ejercicio
+        </label>
+        <Input
+          id="new-exercise"
           type="text"
           value={newExercise}
-          onChange={(e) => setNewExercise(e.target.value)}
+          onChange={(event) => setNewExercise(event.target.value)}
           placeholder="Nombre del nuevo ejercicio"
-          className="flex-1 bg-zinc-900 border border-zinc-800 rounded-xl p-4 text-white focus:outline-none focus:ring-2 focus:ring-[#c22524]"
+          className="flex-1"
         />
-        <button
-          type="submit"
-          disabled={loading}
-          className="bg-[#c22524] text-white px-8 py-4 rounded-xl font-bold hover:bg-red-700 disabled:opacity-50 transition-colors"
-        >
-          {loading ? "Agregando..." : "Agregar"}
-        </button>
+        <Button type="submit" loading={loading}>
+          Agregar
+        </Button>
       </form>
 
-      <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
+      <Card className="overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-left">
-            <thead className="bg-zinc-800/50">
+          <table className="w-full text-left text-sm">
+            <thead className="bg-zinc-800/70">
               <tr>
-                <th className="p-4 text-zinc-400 font-medium text-sm">Ejercicio</th>
-                <th className="p-4 text-zinc-400 font-medium text-sm w-32 text-center">Estado</th>
-                <th className="p-4 text-zinc-400 font-medium text-sm w-32 text-center">Acción</th>
+                <th className="p-4 font-medium text-zinc-300">Ejercicio</th>
+                <th className="p-4 text-center font-medium text-zinc-300">Estado</th>
+                <th className="p-4 text-center font-medium text-zinc-300">Acción</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-800">
-              {exercises.map((ex) => (
-                <tr key={ex.id} className="hover:bg-zinc-800/30 transition-colors">
-                  <td className="p-4 font-medium capitalize text-white">{ex.name}</td>
+              {exercises.map((exercise) => (
+                <tr key={exercise.id} className="hover:bg-zinc-800/30">
+                  <td className="p-4 font-medium capitalize text-zinc-100">{exercise.name}</td>
                   <td className="p-4 text-center">
-                    <span className={`px-3 py-1 rounded-full text-xs font-bold inline-block ${ex.isActive ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'}`}>
-                      {ex.isActive ? 'Activo' : 'Inactivo'}
-                    </span>
+                    <Badge variant={exercise.isActive ? "success" : "danger"}>
+                      {exercise.isActive ? "Activo" : "Inactivo"}
+                    </Badge>
                   </td>
                   <td className="p-4 text-center">
-                    <button
-                      onClick={() => handleToggleStatus(ex.id, ex.isActive)}
-                      className="text-sm font-medium text-zinc-400 hover:text-white transition-colors underline underline-offset-4"
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      loading={savingId === exercise.id}
+                      onClick={() => handleToggleStatus(exercise.id, exercise.isActive)}
                     >
-                      {ex.isActive ? 'Desactivar' : 'Activar'}
-                    </button>
+                      {exercise.isActive ? "Desactivar" : "Activar"}
+                    </Button>
                   </td>
                 </tr>
               ))}
@@ -92,11 +125,12 @@ export function ExercisesClient({ initialExercises }: { initialExercises: Exerci
           </table>
         </div>
         {exercises.length === 0 && (
-          <div className="p-8 text-center text-zinc-500">
+          <div className="p-8 text-center text-sm text-zinc-500">
             No hay ejercicios registrados. Agrega uno nuevo para comenzar.
           </div>
         )}
-      </div>
+      </Card>
     </div>
   );
 }
+

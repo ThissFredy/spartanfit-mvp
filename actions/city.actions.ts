@@ -2,6 +2,7 @@
 
 import prisma from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
+import { Prisma } from "@prisma/client";
 
 export async function getCities(includeInactive = false) {
   try {
@@ -10,7 +11,7 @@ export async function getCities(includeInactive = false) {
       orderBy: { name: "asc" },
     });
     return { success: true, data: cities };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error fetching cities:", error);
     return { success: false, error: "No se pudieron obtener las ciudades." };
   }
@@ -27,8 +28,8 @@ export async function createCity(data: { name: string; isActive?: boolean }) {
     revalidatePath("/admin/cities");
     revalidatePath("/admin/gyms");
     return { success: true, data: city };
-  } catch (error: any) {
-    if (error.code === "P2002") {
+  } catch (error: unknown) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
       return { success: false, error: "Ya existe una ciudad con ese nombre." };
     }
     console.error("Error creating city:", error);
@@ -45,7 +46,7 @@ export async function updateCity(id: string, data: { name: string; isActive?: bo
     revalidatePath("/admin/cities");
     revalidatePath("/admin/gyms");
     return { success: true, data: city };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error updating city:", error);
     return { success: false, error: "Error al actualizar la ciudad." };
   }
@@ -67,7 +68,7 @@ export async function toggleCityStatus(id: string) {
     revalidatePath("/admin/gyms");
     
     return { success: true, data: city };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error toggling city status:", error);
     return { success: false, error: "Error al cambiar el estado de la ciudad." };
   }

@@ -1,10 +1,8 @@
-import { createServerClient } from "@supabase/ssr";
+﻿import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 export async function updateSession(request: NextRequest) {
-  let supabaseResponse = NextResponse.next({
-    request,
-  });
+  let supabaseResponse = NextResponse.next({ request });
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -15,54 +13,56 @@ export async function updateSession(request: NextRequest) {
           return request.cookies.getAll();
         },
         setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) => request.cookies.set(name, value));
-          supabaseResponse = NextResponse.next({
-            request,
-          });
+          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
+          supabaseResponse = NextResponse.next({ request });
           cookiesToSet.forEach(({ name, value, options }) =>
-            supabaseResponse.cookies.set(name, value, options)
+            supabaseResponse.cookies.set(name, value, options),
           );
         },
       },
-    }
+    },
   );
 
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const isAuthRoute = request.nextUrl.pathname.startsWith('/auth') || request.nextUrl.pathname === '/login';
-  const isDashboardRoute = request.nextUrl.pathname.startsWith('/dashboard');
-  const isProfileRoute = request.nextUrl.pathname.startsWith('/profile');
+  const pathname = request.nextUrl.pathname;
+  const isProtectedRoute =
+    pathname.startsWith("/dashboard") ||
+    pathname.startsWith("/profile") ||
+    pathname.startsWith("/chat") ||
+    pathname.startsWith("/progress") ||
+    pathname.startsWith("/admin");
 
-  // Verify suspended status using Supabase client to avoid Prisma Edge Runtime issues
-  if (user && (isDashboardRoute || isProfileRoute)) {
+  if (user && isProtectedRoute) {
     const { data: userData } = await supabase
-      .from('User')
-      .select('status')
-      .eq('id', user.id)
+      .from("User")
+      .select("status")
+      .eq("id", user.id)
       .single();
 
-    if (userData?.status === 'SUSPENDED') {
+    if (userData?.status === "SUSPENDED") {
       await supabase.auth.signOut();
       const url = request.nextUrl.clone();
-      url.pathname = '/';
-      url.searchParams.set('suspended', 'true');
+      url.pathname = "/";
+      url.searchParams.set("suspended", "true");
       return NextResponse.redirect(url);
     }
   }
 
-  if (!user && isDashboardRoute) {
+  if (!user && isProtectedRoute) {
     const url = request.nextUrl.clone();
-    url.pathname = '/';
+    url.pathname = "/";
     return NextResponse.redirect(url);
   }
 
-  if (user && request.nextUrl.pathname === '/') {
+  if (user && pathname === "/") {
     const url = request.nextUrl.clone();
-    url.pathname = '/dashboard';
+    url.pathname = "/dashboard";
     return NextResponse.redirect(url);
   }
 
   return supabaseResponse;
 }
+

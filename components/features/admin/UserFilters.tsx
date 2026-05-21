@@ -1,99 +1,148 @@
-"use client";
+﻿"use client";
 
 import { AdminUserFilters } from "@/actions/admin.actions";
+import { Select } from "@/components/ui/select";
+import { RoleOption } from "@/lib/types/admin.types";
 
 interface Props {
   filters: AdminUserFilters;
   setFilters: (filters: AdminUserFilters) => void;
-  roles: any[];
+  roles: RoleOption[];
 }
 
+const defaultAgeRange = { min: 0, max: 150 };
+const defaultWeightRange = { min: 0, max: 200 };
+
 export function UserFilters({ filters, setFilters, roles }: Props) {
+  const ageRange = filters.ageRange ?? defaultAgeRange;
+  const weightRange = filters.weightRange ?? defaultWeightRange;
+
   return (
-    <div className="bg-[#111] p-6 rounded-2xl border border-white/10 space-y-6">
-      <h2 className="text-xl font-bold text-white tracking-tight">Filtros de Búsqueda</h2>
-      
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+    <div className="space-y-6 rounded-2xl border border-zinc-800 bg-zinc-900/70 p-6">
+      <h2 className="text-xl font-bold text-zinc-100 tracking-tight">Filtros de búsqueda</h2>
+
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
         <div>
-          <label className="block text-sm font-medium text-white/60 mb-2">Buscar por nombre</label>
-          <input 
-            type="text" 
-            placeholder="Ej. Juan Pérez"
-            className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-white/20 transition-all"
+          <label htmlFor="user-search" className="mb-2 block text-sm font-medium text-zinc-300">
+            Buscar por nombre
+          </label>
+          <input
+            id="user-search"
+            type="text"
+            placeholder="Ej. Juan Perez"
+            className="w-full rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-2.5 text-zinc-100 placeholder:text-zinc-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-spartan/70"
             value={filters.searchQuery || ""}
-            onChange={(e) => setFilters({ ...filters, searchQuery: e.target.value })}
+            onChange={(event) => setFilters({ ...filters, searchQuery: event.target.value })}
           />
-        </div>
-        
-        <div>
-          <label className="block text-sm font-medium text-white/60 mb-2">Rol</label>
-          <select 
-            className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:ring-2 focus:ring-white/20 transition-all appearance-none"
-            value={filters.roleId || "ALL"}
-            onChange={(e) => setFilters({ ...filters, roleId: e.target.value })}
-          >
-            <option value="ALL" className="bg-[#111]">Todos los roles</option>
-            {roles.map(r => (
-              <option key={r.id} value={r.id} className="bg-[#111]">{r.name}</option>
-            ))}
-          </select>
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-white/60 mb-2 flex justify-between">
+          <label htmlFor="role-filter" className="mb-2 block text-sm font-medium text-zinc-300">
+            Rol
+          </label>
+          <Select
+            id="role-filter"
+            value={filters.roleId || "ALL"}
+            onChange={(event) => setFilters({ ...filters, roleId: event.target.value })}
+          >
+            <option value="ALL">Todos los roles</option>
+            {roles.map((role) => (
+              <option key={role.id} value={role.id}>
+                {role.name}
+              </option>
+            ))}
+          </Select>
+        </div>
+
+        <div>
+          <label className="mb-2 flex justify-between text-sm font-medium text-zinc-300">
             <span>Edad</span>
-            <span className="text-white font-semibold">{filters.ageRange?.min} - {filters.ageRange?.max}</span>
+            <span className="font-semibold text-zinc-100">
+              {ageRange.min} - {ageRange.max}
+            </span>
           </label>
           <div className="flex items-center gap-4">
-            <input 
-              type="range" min="0" max="150" 
-              value={filters.ageRange?.min || 0}
-              onChange={(e) => setFilters({ ...filters, ageRange: { ...filters.ageRange!, min: Number(e.target.value) }})}
-              className="w-1/2 accent-white"
+            <input
+              aria-label="Edad minima"
+              type="range"
+              min="0"
+              max="150"
+              value={ageRange.min}
+              onChange={(event) =>
+                setFilters({ ...filters, ageRange: { ...ageRange, min: Number(event.target.value) } })
+              }
+              className="w-1/2 accent-spartan"
             />
-            <input 
-              type="range" min="0" max="150" 
-              value={filters.ageRange?.max || 150}
-              onChange={(e) => setFilters({ ...filters, ageRange: { ...filters.ageRange!, max: Number(e.target.value) }})}
-              className="w-1/2 accent-white"
+            <input
+              aria-label="Edad maxima"
+              type="range"
+              min="0"
+              max="150"
+              value={ageRange.max}
+              onChange={(event) =>
+                setFilters({ ...filters, ageRange: { ...ageRange, max: Number(event.target.value) } })
+              }
+              className="w-1/2 accent-spartan"
             />
           </div>
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-white/60 mb-2 flex justify-between">
+          <label className="mb-2 flex justify-between text-sm font-medium text-zinc-300">
             <span>Peso (kg)</span>
-            <span className="text-white font-semibold">{filters.weightRange?.min} - {filters.weightRange?.max}</span>
+            <span className="font-semibold text-zinc-100">
+              {weightRange.min} - {weightRange.max}
+            </span>
           </label>
           <div className="flex items-center gap-4">
-            <input 
-              type="range" min="0" max="200" 
-              value={filters.weightRange?.min || 0}
-              onChange={(e) => setFilters({ ...filters, weightRange: { ...filters.weightRange!, min: Number(e.target.value) }})}
-              className="w-1/2 accent-white"
+            <input
+              aria-label="Peso minimo"
+              type="range"
+              min="0"
+              max="200"
+              value={weightRange.min}
+              onChange={(event) =>
+                setFilters({
+                  ...filters,
+                  weightRange: { ...weightRange, min: Number(event.target.value) },
+                })
+              }
+              className="w-1/2 accent-spartan"
             />
-            <input 
-              type="range" min="0" max="200" 
-              value={filters.weightRange?.max || 200}
-              onChange={(e) => setFilters({ ...filters, weightRange: { ...filters.weightRange!, max: Number(e.target.value) }})}
-              className="w-1/2 accent-white"
+            <input
+              aria-label="Peso maximo"
+              type="range"
+              min="0"
+              max="200"
+              value={weightRange.max}
+              onChange={(event) =>
+                setFilters({
+                  ...filters,
+                  weightRange: { ...weightRange, max: Number(event.target.value) },
+                })
+              }
+              className="w-1/2 accent-spartan"
             />
           </div>
         </div>
       </div>
 
       <div className="flex items-center gap-3 pt-2">
-        <input 
-          type="checkbox" 
+        <input
+          type="checkbox"
           id="includeNulls"
           checked={filters.includeNulls}
-          onChange={(e) => setFilters({ ...filters, includeNulls: e.target.checked })}
-          className="w-5 h-5 rounded border-white/20 bg-white/5 text-white focus:ring-white/20 focus:ring-offset-[#111] accent-white"
+          onChange={(event) => setFilters({ ...filters, includeNulls: event.target.checked })}
+          className="h-5 w-5 accent-spartan"
         />
-        <label htmlFor="includeNulls" className="text-sm font-medium text-white/80 select-none cursor-pointer">
+        <label
+          htmlFor="includeNulls"
+          className="cursor-pointer select-none text-sm font-medium text-zinc-300"
+        >
           Incluir usuarios sin edad o peso especificado
         </label>
       </div>
     </div>
   );
 }
+

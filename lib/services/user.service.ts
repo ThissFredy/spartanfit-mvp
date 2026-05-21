@@ -1,12 +1,20 @@
 import prisma from "@/lib/prisma";
 import { UpdateUserProfileDTO, UserProfileResponse } from "../types/user.types";
 
+interface AuthUserInput {
+  id: string;
+  email?: string | null;
+  user_metadata?: {
+    full_name?: string;
+  } | null;
+}
+
 export class UserService {
   
   /**
    * Syncs a Supabase auth user with Prisma User table.
    */
-  static async syncUser(authUser: any): Promise<UserProfileResponse> {
+  static async syncUser(authUser: AuthUserInput): Promise<UserProfileResponse> {
     const user = await prisma.user.upsert({
       where: { id: authUser.id },
       update: {},
@@ -21,7 +29,7 @@ export class UserService {
         role: true,
       },
     });
-    return user as UserProfileResponse;
+    return user as unknown as UserProfileResponse;
   }
 
   /**
@@ -36,7 +44,7 @@ export class UserService {
       },
     });
     
-    return user as any as UserProfileResponse | null;
+    return user as unknown as UserProfileResponse | null;
   }
 
   /**
@@ -62,7 +70,7 @@ export class UserService {
       },
     });
 
-    return user as any as UserProfileResponse;
+    return user as unknown as UserProfileResponse;
   }
 
   /**

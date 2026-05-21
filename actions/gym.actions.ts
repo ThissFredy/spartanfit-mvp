@@ -2,6 +2,7 @@
 
 import prisma from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
+import { Prisma } from "@prisma/client";
 
 export async function getGyms(includeInactive = false) {
   try {
@@ -13,7 +14,7 @@ export async function getGyms(includeInactive = false) {
       orderBy: { name: "asc" },
     });
     return { success: true, data: gyms };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error fetching gyms:", error);
     return { success: false, error: "No se pudieron obtener los gimnasios." };
   }
@@ -36,7 +37,10 @@ export async function createGym(data: {
     });
     revalidatePath("/admin/gyms");
     return { success: true, data: gym };
-  } catch (error: any) {
+  } catch (error: unknown) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      return { success: false, error: "Ya existe un gimnasio con ese nombre." };
+    }
     console.error("Error creating gym:", error);
     return { success: false, error: "Error al crear el gimnasio." };
   }
@@ -58,7 +62,7 @@ export async function updateGym(
     });
     revalidatePath("/admin/gyms");
     return { success: true, data: gym };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error updating gym:", error);
     return { success: false, error: "Error al actualizar el gimnasio." };
   }
@@ -76,7 +80,7 @@ export async function toggleGymStatus(id: string) {
 
     revalidatePath("/admin/gyms");
     return { success: true, data: gym };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error toggling gym status:", error);
     return {
       success: false,
