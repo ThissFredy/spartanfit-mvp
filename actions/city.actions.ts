@@ -3,6 +3,7 @@
 import prisma from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { Prisma } from "@prisma/client";
+import { ensureAdmin } from "./admin.actions";
 
 export async function getCities(includeInactive = false) {
   try {
@@ -19,6 +20,7 @@ export async function getCities(includeInactive = false) {
 
 export async function createCity(data: { name: string; isActive?: boolean }) {
   try {
+    await ensureAdmin();
     const city = await prisma.city.create({
       data: {
         name: data.name,
@@ -39,6 +41,7 @@ export async function createCity(data: { name: string; isActive?: boolean }) {
 
 export async function updateCity(id: string, data: { name: string; isActive?: boolean }) {
   try {
+    await ensureAdmin();
     const city = await prisma.city.update({
       where: { id },
       data,
@@ -54,6 +57,7 @@ export async function updateCity(id: string, data: { name: string; isActive?: bo
 
 export async function toggleCityStatus(id: string) {
   try {
+    await ensureAdmin();
     const current = await prisma.city.findUnique({ where: { id } });
     if (!current) return { success: false, error: "Ciudad no encontrada." };
 

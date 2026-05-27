@@ -2,6 +2,7 @@
 
 import prisma from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
+import { ensureAdmin } from "./admin.actions";
 
 export async function getExercises() {
   try {
@@ -28,6 +29,7 @@ export async function getActiveExercises() {
 
 export async function createExercise(name: string) {
   try {
+    await ensureAdmin();
     await prisma.exercise.create({
       data: { name },
     });
@@ -41,6 +43,7 @@ export async function createExercise(name: string) {
 
 export async function updateExerciseStatus(id: string, isActive: boolean) {
   try {
+    await ensureAdmin();
     await prisma.exercise.update({
       where: { id },
       data: { isActive },

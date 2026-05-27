@@ -3,6 +3,7 @@
 import prisma from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { Prisma } from "@prisma/client";
+import { ensureAdmin } from "./admin.actions";
 
 export async function getGyms(includeInactive = false) {
   try {
@@ -27,6 +28,7 @@ export async function createGym(data: {
   isActive?: boolean;
 }) {
   try {
+    await ensureAdmin();
     const gym = await prisma.gymLocation.create({
       data: {
         name: data.name,
@@ -56,6 +58,7 @@ export async function updateGym(
   },
 ) {
   try {
+    await ensureAdmin();
     const gym = await prisma.gymLocation.update({
       where: { id },
       data,
@@ -70,6 +73,7 @@ export async function updateGym(
 
 export async function toggleGymStatus(id: string) {
   try {
+    await ensureAdmin();
     const current = await prisma.gymLocation.findUnique({ where: { id } });
     if (!current) return { success: false, error: "Gimnasio no encontrado." };
 

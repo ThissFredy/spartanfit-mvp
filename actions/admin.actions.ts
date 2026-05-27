@@ -16,7 +16,7 @@ export interface AdminUserFilters {
 }
 
 // Ensure the caller is an admin
-async function ensureAdmin() {
+export async function ensureAdmin() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 

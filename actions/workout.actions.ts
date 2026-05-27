@@ -2,6 +2,7 @@
 
 import prisma from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
+import { createClient } from "@/utils/supabase/server";
 
 export async function addWorkoutLog(data: {
   userId: string;
@@ -12,9 +13,13 @@ export async function addWorkoutLog(data: {
   recordedAt: Date;
 }) {
   try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { error: "No autenticado." };
+
     await prisma.workoutLog.create({
       data: {
-        userId: data.userId,
+        userId: user.id, // Mitigación de IDOR
         exerciseId: data.exerciseId,
         sets: data.sets,
         reps: data.reps,
@@ -32,6 +37,17 @@ export async function addWorkoutLog(data: {
 
 export async function getUserWorkoutProgress(userId: string) {
   try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return [];
+    
+    if (user.id !== userId) {
+      const dbUser = await prisma.user.findUnique({ where: { id: user.id }, include: { role: true } });
+      if (dbUser?.role?.name !== "ADMIN") {
+        return [];
+      }
+    }
+
     const logs = await prisma.workoutLog.findMany({
       where: { userId },
       include: { exercise: true },
