@@ -1,26 +1,31 @@
-# Proyecto SpartanFit MVP
+# SpartanFit MVP Project
 
-Este archivo define el contexto global del proyecto.
+This file defines the global context of the project.
 
-## Contexto del Proyecto
+## Project Context
 
 ### 🏋️‍♂️ Project Overview
-**SpartanFit MVP** es una plataforma web moderna de fitness y coaching. Está diseñada para ayudar a los usuarios a rastrear su progreso físico, registrar sus entrenamientos, consumir contenido de fitness e interactuar con entrenadores, mientras proporciona a los administradores herramientas robustas para gestionar usuarios y sucursales físicas de gimnasios.
+
+**SpartanFit MVP** is a modern fitness and coaching web platform. It is designed to help users track their fitness progress, log their workouts, consume fitness content, and interact with coaches, while providing administrators with robust tools to manage users and physical gym branches.
 
 ### 🛠️ Tech Stack & Architecture
-El proyecto está construido con un entorno full-stack JavaScript moderno:
-*   **Framework:** Next.js (App Router) utilizando React Server Components y Server Actions.
-*   **Styling:** Tailwind CSS, utilizando una estética premium, enfocada primero en el modo oscuro (dark-mode-first) con efectos de glassmorphism.
-*   **Database & ORM:** PostgreSQL gestionado a través de **Prisma ORM**.
-*   **BaaS / Authentication:** **Supabase** maneja tanto el alojamiento de PostgreSQL (vía connection pooling) como la Autenticación de Usuarios.
-*   **Architecture Pattern:** Sigue un enfoque estructurado y en capas. Los componentes de UI viven en `components/`, la lógica de enrutamiento del lado del servidor en `app/`, los Next.js Server Actions en `actions/` (actuando como controladores), y la lógica pesada de base de datos/negocio se abstrae en `lib/services/`.
+
+The project is built with a modern full-stack JavaScript environment:
+
+* **Framework:** Next.js (App Router) using React Server Components and Server Actions.
+* **Styling:** Tailwind CSS, using a premium, dark-mode-first aesthetic with glassmorphism effects.
+* **Database & ORM:** PostgreSQL managed through **Prisma ORM**.
+* **BaaS / Authentication:** **Supabase** handles both PostgreSQL hosting (via connection pooling) and User Authentication.
+* **Architecture Pattern:** Follows a structured, layered approach. UI components live in `components/`, server-side routing logic in `app/`, Next.js Server Actions in `actions/` (acting as controllers), and heavy database/business logic is abstracted in `lib/services/`.
 
 ### ✨ Core Features & Modules
-1. **User Identity & Profiles (`User`, `Role`):** Autenticación vía Supabase. Rastreo de datos vitales (edad, peso, altura, índice de actividad) y metas. Soporte RBAC (roles como `ADMIN`).
-2. **Gym Network Management (`City`, `GymLocation`, `UserGym`):** Gestión de red de sucursales. Administradores tienen un dashboard para el CRUD de ciudades y gimnasios. Usuarios pueden multiseleccionar sus gimnasios.
-3. **Fitness Tracking (`Metric`, `WorkoutLog`):** Registro de métricas corporales y de entrenamientos (peso, repeticiones y ejercicios por sesión).
-4. **Educational Content (`Content`):** Contenido categorizado por dificultad con un flag único (`isScienceBacked`).
-5. **Coaching & Communication (`ChatMessage`):** Sistema de chat para mensajes entre roles (ej. usuario y entrenador).
+
+1. **User Identity & Profiles (`User`, `Role`):** Authentication via Supabase. Tracking of vital data (age, weight, height, activity index) and goals. RBAC support (roles like `ADMIN`).
+2. **Gym Network Management (`City`, `GymLocation`, `UserGym`):** Branch network management. Administrators have a dashboard for City and Gym CRUD operations. Users can multi-select their gyms.
+3. **Fitness Tracking (`Metric`, `WorkoutLog`):** Logging of body metrics and workouts (weight, reps, and exercises per session).
+4. **Educational Content (`Content`):** Content categorized by difficulty with a unique flag (`isScienceBacked`).
+5. **Coaching & Communication (`ChatMessage`):** Chat system for messaging between roles (e.g., user and coach).
 
 ### 🤖 AI-Driven Workflow
-Este repositorio utiliza un enfoque de **Spec-Driven Development** guiado por este archivo `AGENTS.md`. Los requerimientos se transforman en especificaciones técnicas (`specs/`) y el código se genera sistemáticamente (Base de datos -> Servicios -> Frontend) basándose en contratos aprobados.
+
+This repository uses a **Spec-Driven Development** approach guided by this `AGENTS.md` file. Requirements are transformed into technical specifications (`specs/`) and code is systematically generated (Database -> Services -> Frontend) based on approved contracts.
